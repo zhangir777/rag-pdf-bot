@@ -4,3 +4,4 @@ __pycache__/
 *.pdf
 .pytest_cache/
 .ruff_cache/
+!samples/*.pdf
