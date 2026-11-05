@@ -9,6 +9,10 @@ Telegram bot that answers questions about a PDF you send it, and shows the pages
 
 Stack: Python 3.12, aiogram 3, pypdf, aiohttp.
 
+![Demo chat](docs/demo.png)
+
+Try it with `samples/acme_dental.pdf`.
+
 ## Run
 
 ```
