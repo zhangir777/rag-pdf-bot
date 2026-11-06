@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 import aiohttp
+import sentry_sdk
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
@@ -90,8 +91,16 @@ async def heartbeat(session: aiohttp.ClientSession) -> None:
         return
     url = f"https://api.{os.environ.get('DD_SITE', 'datadoghq.com')}/api/v1/series"
     while True:
-        body = {"series": [{"metric": "bots.heroku.up", "points": [[int(time.time()), 1]],
-                            "type": "gauge", "tags": ["service:rag-pdf-bot"]}]}
+        body = {
+            "series": [
+                {
+                    "metric": "bots.heroku.up",
+                    "points": [[int(time.time()), 1]],
+                    "type": "gauge",
+                    "tags": ["service:rag-pdf-bot"],
+                }
+            ]
+        }
         try:
             await session.post(url, json=body, headers={"DD-API-KEY": key})
         except aiohttp.ClientError:
@@ -102,6 +111,9 @@ async def heartbeat(session: aiohttp.ClientSession) -> None:
 async def main() -> None:
     load_dotenv()
     logging.basicConfig(level=logging.INFO)
+    if dsn := os.environ.get("SENTRY_DSN"):  # optional error tracking
+        sentry_sdk.init(dsn=dsn, environment="production", server_name="heroku-rag")
+        sentry_sdk.set_tag("bot", "rag")
     providers = ai.providers_from_env()
     if not providers:
         raise SystemExit("Set GROQ_API_KEY or GEMINI_API_KEY in .env")

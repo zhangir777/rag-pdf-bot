@@ -8,6 +8,7 @@ dependencies = [
     "aiogram>=3.31",
     "pypdf>=5.0",
     "python-dotenv>=1.2.4",
+    "sentry-sdk>=2.0",
 ]
 
 [dependency-groups]
