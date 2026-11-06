@@ -7,6 +7,8 @@ Telegram bot that answers questions about a PDF you send it, and shows the pages
 - Answers: Groq (free tier), with Gemini as a fallback. The model may use only the found excerpts.
 - If the document does not contain the answer, the bot says so instead of guessing.
 
+Live demo: [@zhangirragdemobot](https://t.me/zhangirragdemobot)
+
 Stack: Python 3.12, aiogram 3, pypdf, aiohttp.
 
 ![Demo chat](docs/demo.png)
