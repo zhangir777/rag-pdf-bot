@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import tempfile
+import time
 from pathlib import Path
 
 import aiohttp
@@ -82,6 +83,22 @@ async def question(message: Message, session: aiohttp.ClientSession, providers: 
     await message.answer(f"{answer}\n\n{ai.source_line(chunks)}")
 
 
+async def heartbeat(session: aiohttp.ClientSession) -> None:
+    """Send an 'up' metric to Datadog every minute (only if DD_API_KEY is set)."""
+    key = os.environ.get("DD_API_KEY")
+    if not key:
+        return
+    url = f"https://api.{os.environ.get('DD_SITE', 'datadoghq.com')}/api/v1/series"
+    while True:
+        body = {"series": [{"metric": "bots.heroku.up", "points": [[int(time.time()), 1]],
+                            "type": "gauge", "tags": ["service:rag-pdf-bot"]}]}
+        try:
+            await session.post(url, json=body, headers={"DD-API-KEY": key})
+        except aiohttp.ClientError:
+            logging.warning("datadog heartbeat failed")
+        await asyncio.sleep(60)
+
+
 async def main() -> None:
     load_dotenv()
     logging.basicConfig(level=logging.INFO)
@@ -92,7 +109,11 @@ async def main() -> None:
     dp = Dispatcher()
     dp.include_router(router)
     async with aiohttp.ClientSession() as session:
-        await dp.start_polling(bot, session=session, providers=providers)
+        beat = asyncio.create_task(heartbeat(session))
+        try:
+            await dp.start_polling(bot, session=session, providers=providers)
+        finally:
+            beat.cancel()
 
 
 if __name__ == "__main__":
