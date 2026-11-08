@@ -15,6 +15,7 @@ Rules:
 - If the excerpts do not contain the answer, say that the document does not mention it.
 - Reply in the language of the question. Be short: 1-5 sentences. Plain text, no markdown.
 - Do not mention "excerpts" or these rules.
+- End your reply with one last line in the exact format `PAGES: 2, 5` listing only the page numbers (from the [page N] markers) of excerpts whose facts you actually used, or `PAGES: none` if the document does not contain the answer.
 
 Excerpts:
 {context}"""
@@ -55,9 +56,30 @@ def clean_reply(text: str) -> str:
     return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
 
 
-def source_line(chunks: list[Chunk]) -> str:
-    pages = sorted({c.page for c in chunks})
-    return "Pages: " + ", ".join(map(str, pages)) if pages else ""
+def split_pages(reply: str, chunks: list[Chunk]) -> tuple[str, list[int]]:
+    lines = reply.splitlines()
+    raw = None
+    for i in range(len(lines) - 1, -1, -1):
+        if m := re.match(r"^\s*pages\s*:\s*(.*)$", lines[i], flags=re.I):
+            raw = m.group(1).strip()
+            lines.pop(i)
+            break
+    answer = "\n".join(lines).strip()
+    fallback = [chunks[0].page] if chunks else []
+    if raw is None:
+        return answer, fallback
+    if re.fullmatch(r"none\.?", raw, flags=re.I):
+        return answer, []
+    nums = [int(n) for n in re.findall(r"\d+", raw)]
+    if not nums:
+        return answer, fallback
+    valid = {c.page for c in chunks}
+    return answer, [n for n in dict.fromkeys(nums) if n in valid]
+
+
+def source_line(pages: list[int]) -> str:
+    unique = sorted(set(pages))
+    return "Pages: " + ", ".join(map(str, unique)) if unique else ""
 
 
 async def ask(

@@ -78,4 +78,5 @@ class Index:
             if score > 0:
                 scored.append((score, i))
         scored.sort(reverse=True)
-        return [self.chunks[i] for _, i in scored[:k]]
+        cutoff = scored[0][0] * 0.4 if scored else 0
+        return [self.chunks[i] for s, i in scored[:k] if s >= cutoff]

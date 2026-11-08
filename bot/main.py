@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import re
 import tempfile
 import time
 from pathlib import Path
@@ -77,11 +78,12 @@ async def question(message: Message, session: aiohttp.ClientSession, providers: 
         await message.answer("I did not find anything about this in the document.")
         return
     try:
-        answer = await ai.ask(session, providers, ai.build_messages(chunks, message.text))
+        reply = await ai.ask(session, providers, ai.build_messages(chunks, message.text))
     except ai.AIError:
         await message.answer("The AI is busy right now. Please try again in a minute.")
         return
-    await message.answer(f"{answer}\n\n{ai.source_line(chunks)}")
+    answer, pages = ai.split_pages(reply, chunks)
+    await message.answer(f"{answer}\n\n{ai.source_line(pages)}" if pages else answer)
 
 
 async def heartbeat(session: aiohttp.ClientSession) -> None:
@@ -108,11 +110,42 @@ async def heartbeat(session: aiohttp.ClientSession) -> None:
         await asyncio.sleep(60)
 
 
+_TOKEN_RE = re.compile(r"bot\d+:[A-Za-z0-9_-]+")
+
+
+def before_send(event, hint):
+    log = event.get("logentry") or {}
+    msg = log.get("formatted") or log.get("message") or event.get("message") or ""
+    if event.get("logger") == "aiogram.dispatcher" and "Failed to fetch updates" in msg:
+        return None
+    return event
+
+
+def before_breadcrumb(crumb, hint):
+    if isinstance(crumb.get("message"), str):
+        crumb["message"] = _TOKEN_RE.sub("bot<hidden>", crumb["message"])
+    if isinstance(data := crumb.get("data"), dict):
+        for k, v in data.items():
+            if isinstance(v, str):
+                data[k] = _TOKEN_RE.sub("bot<hidden>", v)
+            elif isinstance(v, dict):
+                for k2, v2 in v.items():
+                    if isinstance(v2, str):
+                        v[k2] = _TOKEN_RE.sub("bot<hidden>", v2)
+    return crumb
+
+
 async def main() -> None:
     load_dotenv()
     logging.basicConfig(level=logging.INFO)
     if dsn := os.environ.get("SENTRY_DSN"):  # optional error tracking
-        sentry_sdk.init(dsn=dsn, environment="production", server_name="heroku-rag")
+        sentry_sdk.init(
+            dsn=dsn,
+            environment="production",
+            server_name="heroku-rag",
+            before_send=before_send,
+            before_breadcrumb=before_breadcrumb,
+        )
         sentry_sdk.set_tag("bot", "rag")
     providers = ai.providers_from_env()
     if not providers:
