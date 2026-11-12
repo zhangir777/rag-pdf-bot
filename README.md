@@ -1,5 +1,7 @@
 # rag-pdf-bot
 
+**[Watch the demo video (mp4)](docs/demo.mp4)**
+
 Telegram bot that answers questions about a PDF you send it, and shows the pages the answer came from.
 
 - Send a PDF (up to 10 MB), then ask questions in chat.
